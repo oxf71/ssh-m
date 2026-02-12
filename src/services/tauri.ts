@@ -76,3 +76,18 @@ export async function queryBalances(
 export async function getDefaultChainConfigs(): Promise<ChainConfig[]> {
   return invoke("get_default_chain_configs");
 }
+
+// ============ App Settings ============
+
+export interface AppSettings {
+  default_terminal: string;
+  ssh_config_path: string;
+}
+
+export async function saveAppSettings(defaultTerminal: string, sshConfigPath: string): Promise<void> {
+  return invoke("save_app_settings", { defaultTerminal, sshConfigPath });
+}
+
+export async function getAppSettings(): Promise<AppSettings> {
+  return invoke("get_app_settings");
+}

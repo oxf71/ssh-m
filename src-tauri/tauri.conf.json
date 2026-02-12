@@ -26,6 +26,12 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "publisher": "oxf71",
+    "copyright": "© 2026 oxf71",
+    "homepage": "https://github.com/oxf71/ssh-m",
+    "shortDescription": "SSH 登录管理",
+    "longDescription": "SSH-M 是一个基于 Tauri v2 的桌面应用，提供 SSH 配置管理功能。",
+    "category": "Utility",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

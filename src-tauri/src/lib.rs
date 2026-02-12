@@ -2,14 +2,15 @@ mod blockchain;
 mod commands;
 mod crypto;
 mod onepassword;
+pub mod settings;
 mod ssh;
 mod tray;
 
 use commands::blockchain::{derive_accounts, get_default_chain_configs, query_balances};
 use commands::onepassword::{check_op_status, list_vault_items, list_vaults};
 use commands::ssh::{
-    list_ssh_config_files, list_ssh_hosts, open_ssh_terminal, read_ssh_config, refresh_ssh_config,
-    save_ssh_config, validate_ssh_config,
+    get_app_settings, list_ssh_config_files, list_ssh_hosts, open_ssh_terminal, read_ssh_config,
+    refresh_ssh_config, save_app_settings, save_ssh_config, validate_ssh_config,
 };
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -25,6 +26,8 @@ pub fn run() {
             validate_ssh_config,
             save_ssh_config,
             list_ssh_config_files,
+            save_app_settings,
+            get_app_settings,
             // 1Password commands
             check_op_status,
             list_vaults,

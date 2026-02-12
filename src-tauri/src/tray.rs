@@ -5,6 +5,7 @@ use tauri::{
     AppHandle, Manager, Wry,
 };
 
+use crate::settings;
 use crate::ssh::config::parse_ssh_config;
 use crate::ssh::types::SshHostGroup;
 
@@ -22,6 +23,14 @@ pub fn setup_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
             let id = event.id().as_ref();
             if id == "quit" {
                 app.exit(0);
+            } else if id == "about" {
+                if let Some(w) = app.get_webview_window("main") {
+                    let _ = w.show();
+                    let _ = w.set_focus();
+                    let _ = w.eval(
+                        r#"window.__TAURI_INTERNALS__?.invoke?.("plugin:dialog|message", { message: "SSH-M v0.1.0\n\n作者: oxf71\nGitHub: https://github.com/oxf71/ssh-m\n\n SSH 登录管理 " }) || alert("SSH-M v0.1.0\n\n作者: oxf71\nGitHub: https://github.com/oxf71/ssh-m")"#,
+                    );
+                }
             } else if id == "show" {
                 if let Some(w) = app.get_webview_window("main") {
                     let _ = w.show();
@@ -114,33 +123,69 @@ fn build_tray_menu(
     menu_builder = menu_builder.text("refresh", "↻ 刷新主机列表");
     menu_builder = menu_builder.text("show", "显示窗口");
     menu_builder = menu_builder.separator();
+    menu_builder = menu_builder.text("about", "关于 SSH-M  v0.1.0  by oxf71");
     menu_builder = menu_builder.text("quit", "退出 SSH-M");
 
     Ok(menu_builder.build()?)
 }
 
-/// Open an SSH connection in the system terminal (same logic as the command).
+/// Open an SSH connection using the user-configured terminal.
 fn open_ssh_from_tray(host: &str) -> Result<(), String> {
+    let terminal = settings::load_settings().default_terminal;
+
     #[cfg(target_os = "macos")]
     {
-        let script = format!(
-            r#"
-            tell application "Terminal"
-                activate
-                do script "ssh {}"
-            end tell
-            "#,
-            host
-        );
-        std::process::Command::new("osascript")
-            .arg("-e")
-            .arg(&script)
-            .spawn()
-            .map_err(|e| format!("Failed to open terminal: {}", e))?;
+        if terminal == "warp" {
+            // Warp doesn't support AppleScript `do script`, and using
+            // System Events keystroke requires Accessibility permissions.
+            // Use a self-deleting .command file instead.
+            let tmp_path = format!("/tmp/ssh-m-connect-{}.command", std::process::id());
+            let script_content = format!("#!/bin/bash\nexec ssh {}\n", host);
+            std::fs::write(&tmp_path, &script_content)
+                .map_err(|e| format!("Failed to create temp script: {}", e))?;
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                std::fs::set_permissions(&tmp_path, std::fs::Permissions::from_mode(0o755))
+                    .map_err(|e| format!("Failed to set script permissions: {}", e))?;
+            }
+            std::process::Command::new("open")
+                .args(["-a", "Warp", &tmp_path])
+                .spawn()
+                .map_err(|e| format!("Failed to open Warp: {}", e))?;
+        } else {
+            let script = match terminal.as_str() {
+                "iterm" => format!(
+                    r#"
+                    tell application "iTerm"
+                        activate
+                        create window with default profile command "ssh {}"
+                    end tell
+                    "#,
+                    host
+                ),
+                _ => format!(
+                    r#"
+                    tell application "Terminal"
+                        activate
+                        do script "ssh {}"
+                    end tell
+                    "#,
+                    host
+                ),
+            };
+
+            std::process::Command::new("osascript")
+                .arg("-e")
+                .arg(&script)
+                .spawn()
+                .map_err(|e| format!("Failed to open terminal: {}", e))?;
+        }
     }
 
     #[cfg(target_os = "linux")]
     {
+        let _ = &terminal; // suppress unused warning
         let terminals = ["gnome-terminal", "konsole", "xterm"];
         let mut launched = false;
         for term in &terminals {
@@ -160,6 +205,7 @@ fn open_ssh_from_tray(host: &str) -> Result<(), String> {
 
     #[cfg(target_os = "windows")]
     {
+        let _ = &terminal; // suppress unused warning
         std::process::Command::new("cmd")
             .args(["/c", "start", "ssh", host])
             .spawn()

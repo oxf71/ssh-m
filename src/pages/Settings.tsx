@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Settings as SettingsIcon, Save, RotateCcw, Sun, Moon, Monitor } from "lucide-react";
 import { clsx } from "clsx";
 import { useTheme, type ThemeMode } from "../hooks/useTheme";
+import { saveAppSettings, getAppSettings } from "../services/tauri";
 
 // --- 区块链 RPC 配置（暂时注释）---
 // interface ChainRpcSetting { name: string; chain_type: string; rpc_url: string; default_url: string; }
@@ -15,17 +16,31 @@ const themeOptions: { value: ThemeMode; label: string; icon: typeof Sun }[] = [
 
 export function SettingsPage() {
   const { mode: themeMode, setTheme } = useTheme();
-  const [defaultTerminal, setDefaultTerminal] = useState(
-    () => localStorage.getItem("ssh-m:defaultTerminal") || "terminal"
-  );
-  const [sshConfigPath, setSshConfigPath] = useState(
-    () => localStorage.getItem("ssh-m:sshConfigPath") || "~/.ssh/config"
-  );
+  const [defaultTerminal, setDefaultTerminal] = useState("terminal");
+  const [sshConfigPath, setSshConfigPath] = useState("~/.ssh/config");
   const [saved, setSaved] = useState(false);
 
-  const handleSave = () => {
+  // Load settings from backend on mount
+  useEffect(() => {
+    getAppSettings().then((s) => {
+      setDefaultTerminal(s.default_terminal);
+      setSshConfigPath(s.ssh_config_path);
+    }).catch(() => {
+      // Fallback to localStorage for first run
+      setDefaultTerminal(localStorage.getItem("ssh-m:defaultTerminal") || "terminal");
+      setSshConfigPath(localStorage.getItem("ssh-m:sshConfigPath") || "~/.ssh/config");
+    });
+  }, []);
+
+  const handleSave = async () => {
+    // Save to both localStorage (for frontend) and backend (for tray)
     localStorage.setItem("ssh-m:defaultTerminal", defaultTerminal);
     localStorage.setItem("ssh-m:sshConfigPath", sshConfigPath);
+    try {
+      await saveAppSettings(defaultTerminal, sshConfigPath);
+    } catch (e) {
+      console.error("Failed to save settings to backend:", e);
+    }
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };

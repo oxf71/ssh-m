@@ -1,3 +1,4 @@
+use crate::settings::{self, AppSettings};
 use crate::ssh::config::{parse_ssh_config, ssh_config_path};
 use crate::ssh::types::SshHost;
 use glob::glob;
@@ -144,45 +145,52 @@ pub fn open_ssh_terminal(host: String, terminal: Option<String>) -> Result<(), S
 
     #[cfg(target_os = "macos")]
     {
-        let script = match terminal.as_str() {
-            "iterm" => format!(
-                r#"
-                tell application "iTerm"
-                    activate
-                    create window with default profile command "ssh {}"
-                end tell
-                "#,
-                host
-            ),
-            "warp" => format!(
-                r#"
-                tell application "Warp"
-                    activate
-                end tell
-                delay 0.5
-                tell application "System Events"
-                    keystroke "ssh {}"
-                    keystroke return
-                end tell
-                "#,
-                host
-            ),
-            _ => format!(
-                r#"
-                tell application "Terminal"
-                    activate
-                    do script "ssh {}"
-                end tell
-                "#,
-                host
-            ),
-        };
+        if terminal == "warp" {
+            // Warp doesn't support AppleScript `do script`, and using
+            // System Events keystroke requires Accessibility permissions.
+            // Use a self-deleting .command file instead.
+            let tmp_path = format!("/tmp/ssh-m-connect-{}.command", std::process::id());
+            let script_content = format!("#!/bin/bash\nexec ssh {}\n", host);
+            std::fs::write(&tmp_path, &script_content)
+                .map_err(|e| format!("Failed to create temp script: {}", e))?;
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                std::fs::set_permissions(&tmp_path, std::fs::Permissions::from_mode(0o755))
+                    .map_err(|e| format!("Failed to set script permissions: {}", e))?;
+            }
+            std::process::Command::new("open")
+                .args(["-a", "Warp", &tmp_path])
+                .spawn()
+                .map_err(|e| format!("Failed to open Warp: {}", e))?;
+        } else {
+            let script = match terminal.as_str() {
+                "iterm" => format!(
+                    r#"
+                    tell application "iTerm"
+                        activate
+                        create window with default profile command "ssh {}"
+                    end tell
+                    "#,
+                    host
+                ),
+                _ => format!(
+                    r#"
+                    tell application "Terminal"
+                        activate
+                        do script "ssh {}"
+                    end tell
+                    "#,
+                    host
+                ),
+            };
 
-        std::process::Command::new("osascript")
-            .arg("-e")
-            .arg(&script)
-            .spawn()
-            .map_err(|e| format!("Failed to open terminal: {}", e))?;
+            std::process::Command::new("osascript")
+                .arg("-e")
+                .arg(&script)
+                .spawn()
+                .map_err(|e| format!("Failed to open terminal: {}", e))?;
+        }
     }
 
     #[cfg(target_os = "linux")]
@@ -549,4 +557,18 @@ pub fn save_ssh_config(content: String, path: Option<String>) -> Result<Vec<Stri
     fs::write(&canonical, &content).map_err(|e| format!("Failed to save SSH config: {}", e))?;
 
     Ok(warnings)
+}
+
+#[tauri::command]
+pub fn save_app_settings(default_terminal: String, ssh_config_path: String) -> Result<(), String> {
+    let s = AppSettings {
+        default_terminal,
+        ssh_config_path,
+    };
+    settings::save_settings_to_file(&s)
+}
+
+#[tauri::command]
+pub fn get_app_settings() -> Result<AppSettings, String> {
+    Ok(settings::load_settings())
 }
