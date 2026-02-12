@@ -3,6 +3,7 @@ mod commands;
 mod crypto;
 mod onepassword;
 mod ssh;
+mod tray;
 
 use commands::blockchain::{derive_accounts, get_default_chain_configs, query_balances};
 use commands::onepassword::{check_op_status, list_vault_items, list_vaults};
@@ -33,6 +34,20 @@ pub fn run() {
             query_balances,
             get_default_chain_configs,
         ])
+        .setup(|app| {
+            // Setup system tray
+            tray::setup_tray(app.handle())?;
+            Ok(())
+        })
+        .on_window_event(|window, event| {
+            // 关闭主窗口时只隐藏到后台，不退出应用
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                if window.label() == "main" {
+                    api.prevent_close();
+                    let _ = window.hide();
+                }
+            }
+        })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
