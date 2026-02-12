@@ -1,12 +1,20 @@
 import { useState } from "react";
-import { Settings as SettingsIcon, Save, RotateCcw } from "lucide-react";
+import { Settings as SettingsIcon, Save, RotateCcw, Sun, Moon, Monitor } from "lucide-react";
 import { clsx } from "clsx";
+import { useTheme, type ThemeMode } from "../hooks/useTheme";
 
 // --- 区块链 RPC 配置（暂时注释）---
 // interface ChainRpcSetting { name: string; chain_type: string; rpc_url: string; default_url: string; }
 // const defaultRpcSettings: ChainRpcSetting[] = [ ... ];
 
+const themeOptions: { value: ThemeMode; label: string; icon: typeof Sun }[] = [
+  { value: "light", label: "浅色", icon: Sun },
+  { value: "dark", label: "深色", icon: Moon },
+  { value: "system", label: "跟随系统", icon: Monitor },
+];
+
 export function SettingsPage() {
+  const { mode: themeMode, setTheme } = useTheme();
   const [defaultTerminal, setDefaultTerminal] = useState(
     () => localStorage.getItem("ssh-m:defaultTerminal") || "terminal"
   );
@@ -31,6 +39,31 @@ export function SettingsPage() {
         </h1>
         <p className="text-sm text-text-dim mt-1">配置 SSH 管理偏好</p>
       </div>
+
+      {/* Appearance */}
+      <section className="bg-surface-light border border-border rounded-xl p-5 mb-6">
+        <h2 className="text-sm font-semibold mb-4">外观</h2>
+        <div className="flex items-center gap-3">
+          <label className="w-32 text-sm text-text-dim shrink-0">主题模式</label>
+          <div className="flex gap-2">
+            {themeOptions.map(({ value, label, icon: Icon }) => (
+              <button
+                key={value}
+                onClick={() => setTheme(value)}
+                className={clsx(
+                  "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all border",
+                  themeMode === value
+                    ? "bg-primary text-white border-primary"
+                    : "bg-surface border-border text-text-dim hover:text-text hover:border-primary/50",
+                )}
+              >
+                <Icon className="w-4 h-4" />
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </section>
 
       {/* SSH Settings */}
       <section className="bg-surface-light border border-border rounded-xl p-5 mb-6">
