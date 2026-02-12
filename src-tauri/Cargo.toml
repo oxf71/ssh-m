@@ -29,7 +29,7 @@ tokio = { version = "1", features = ["full"] }
 ssh2-config = "0.7"
 
 # 1Password CLI integration
-which = "7"
+which = "8"
 
 # Crypto / BIP39 / key derivation
 bip39 = "2"
@@ -40,11 +40,11 @@ secp256k1 = { version = "0.29", features = ["rand-std"] }
 alloy = { version = "1", features = ["full", "provider-http", "sol-types"] }
 
 # Solana
-solana-sdk = "2"
-solana-client = "2"
+solana-sdk = "3"
+solana-client = "3"
 
 # Bitcoin balance via REST API
-reqwest = { version = "0.12", features = ["json"] }
+reqwest = { version = "0.13", features = ["json"] }
 
 # Utility
 anyhow = "1"
